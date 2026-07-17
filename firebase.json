@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "target": "historial",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
