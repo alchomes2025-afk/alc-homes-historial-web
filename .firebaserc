@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "alc-homes-checkin"
+  },
+  "targets": {
+    "alc-homes-checkin": {
+      "hosting": {
+        "historial": [
+          "alc-homes-historial"
+        ]
+      }
+    }
+  }
+}
