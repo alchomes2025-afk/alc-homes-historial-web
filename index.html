@@ -189,6 +189,18 @@ header p {
   color: var(--ink-soft);
   margin-top: 2px;
 }
+.day-block-title {
+  font-family: Georgia, serif;
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--azulejo-dk);
+  text-transform: capitalize;
+  padding: 4px 2px;
+  margin: 22px 0 10px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 6px;
+}
+.day-block-title:first-child { margin-top: 0; }
 
 #empty, #loading, #error {
   text-align: center;
@@ -404,6 +416,23 @@ function initials(name) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
+// Etiqueta legible del día de check-in (Hoy / Ayer / Mañana / 17 de julio de 2026)
+function fmtCheckinDayLabel(iso) {
+  if (!iso) return 'Sin fecha';
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
+    const ayer   = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+    const mismoDia = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    if (mismoDia(d, hoy))    return `Hoy · ${d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    if (mismoDia(d, manana)) return `Mañana · ${d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    if (mismoDia(d, ayer))   return `Ayer · ${d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  } catch (_) { return iso; }
+}
+
 // ── GATE ───────────────────────────────────────────────────────────────
 function unlock() {
   const val = $('gate-input').value.trim();
@@ -456,10 +485,10 @@ async function loadList() {
       return;
     }
 
-    // Ordenar reservas: más reciente a más antigua, por última actividad
+    // Ordenar reservas por día de check-in (arrival): más reciente a más antigua
     const reservas = (data.reservas || []).slice().sort((a, b) => {
-      const ta = a.last_activity ? new Date(a.last_activity).getTime() : 0;
-      const tb = b.last_activity ? new Date(b.last_activity).getTime() : 0;
+      const ta = a.arrival ? new Date(a.arrival + 'T00:00:00').getTime() : 0;
+      const tb = b.arrival ? new Date(b.arrival + 'T00:00:00').getTime() : 0;
       return tb - ta;
     });
 
@@ -470,7 +499,18 @@ async function loadList() {
       return;
     }
 
-    $('res-list').innerHTML = reservas.map(r => `
+    // Agrupar por día de check-in, insertando un bloque con título por cada día
+    let html = '';
+    let diaActual = null;
+
+    reservas.forEach(r => {
+      const dayKey = r.arrival || '';
+      if (dayKey !== diaActual) {
+        html += `<div class="day-block-title">${fmtCheckinDayLabel(r.arrival)}</div>`;
+        diaActual = dayKey;
+      }
+
+      html += `
       <div class="res-card" onclick="showDetail('${r.ref}')">
         <div class="res-avatar">${initials(r.room_name)}</div>
         <div class="res-main">
@@ -483,8 +523,10 @@ async function loadList() {
           <div class="res-msgcount">${r.n_mensajes} mensaje${r.n_mensajes === 1 ? '' : 's'}</div>
           <div class="res-time">${fmtDateTime(r.last_activity)}</div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    });
+
+    $('res-list').innerHTML = html;
 
   } catch (err) {
     $('loading').style.display = 'none';
