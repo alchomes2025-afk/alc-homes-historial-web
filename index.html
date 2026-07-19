@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Reservas</title>
+    <style>
+        /* =========================================
+           Variables CSS (Adaptación Automática Día/Noche)
+           ========================================= */
+        :root {
+            --bg-color: #f9f9f9;
+            --text-color: #333333;
+            --separator-bg: #e0e0e0;
+            --separator-text: #555555;
+            --card-bg: #ffffff;
+            --card-border: #dddddd;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+        }
+
+        /* Detecta si el usuario tiene activado el modo oscuro en su dispositivo */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #121212;
+                --text-color: #e0e0e0;
+                --separator-bg: #2c2c2c;
+                --separator-text: #aaaaaa;
+                --card-bg: #1e1e1e;
+                --card-border: #333333;
+                --shadow-color: rgba(0, 0, 0, 0.3);
+            }
+        }
+
+        /* =========================================
+           Estilos Generales
+           ========================================= */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .contenedor-reservas {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* =========================================
+           Estilos de Componentes (Separadores y Tarjetas)
+           ========================================= */
+        .separador-dia {
+            background-color: var(--separator-bg);
+            color: var(--separator-text);
+            padding: 8px 15px;
+            margin: 25px 0 10px 0;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 1px 3px var(--shadow-color);
+        }
+
+        .tarjeta-reserva {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px var(--shadow-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-cliente {
+            font-weight: 500;
+        }
+
+        .info-hora {
+            font-size: 0.9em;
+            color: var(--separator-text);
+            background-color: var(--bg-color);
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="contenedor-reservas" id="lista-reservas">
+        <!-- El contenido se inyectará dinámicamente mediante JavaScript -->
+    </div>
+
+    <script>
+        // 1. Simulación de los datos que obtienes tras validar el token.
+        // Asegúrate de reemplazar esto con tu llamada real a la API o base de datos.
+        const datosReservas = [
+            { id: 1, cliente: "Ana García", fecha: "2026-07-20T10:00:00" },
+            { id: 2, cliente: "Carlos López", fecha: "2026-07-19T16:30:00" },
+            { id: 3, cliente: "María Pérez", fecha: "2026-07-20T12:00:00" },
+            { id: 4, cliente: "Juan Martínez", fecha: "2026-07-18T09:15:00" },
+            { id: 5, cliente: "Lucía Fernández", fecha: "2026-07-19T11:00:00" }
+        ];
+
+        // Función auxiliar para extraer solo la fecha (Ej: "19/07/2026")
+        const formatearDia = (cadenaFecha) => {
+            const fecha = new Date(cadenaFecha);
+            return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        };
+
+        // Función auxiliar para extraer solo la hora (Ej: "16:30")
+        const formatearHora = (cadenaFecha) => {
+            const fecha = new Date(cadenaFecha);
+            return fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // 2. Función principal que procesa y renderiza las reservas
+        function procesarReservas(reservas) {
+            const contenedor = document.getElementById('lista-reservas');
+            contenedor.innerHTML = ''; // Limpiar el contenedor por si había datos previos
+
+            // A. ORDENAR: De más reciente a menos reciente (Descendente)
+            const reservasOrdenadas = reservas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+            let diaActualEnBucle = null;
+
+            reservasOrdenadas.forEach(reserva => {
+                const diaDeLaReserva = formatearDia(reserva.fecha);
+
+                // B. SEPARADORES: Si el día de esta reserva es distinto al anterior, creamos un separador
+                if (diaDeLaReserva !== diaActualEnBucle) {
+                    const elementoSeparador = document.createElement('div');
+                    elementoSeparador.className = 'separador-dia';
+                    elementoSeparador.textContent = diaDeLaReserva;
+                    contenedor.appendChild(elementoSeparador);
+                    
+                    diaActualEnBucle = diaDeLaReserva; // Actualizamos el día de referencia
+                }
+
+                // C. TARJETAS: Crear la tarjeta visual para la reserva
+                const tarjeta = document.createElement('div');
+                tarjeta.className = 'tarjeta-reserva';
+                tarjeta.innerHTML = `
+                    <div class="info-cliente">${reserva.cliente}</div>
+                    <div class="info-hora">⏰ ${formatearHora(reserva.fecha)}</div>
+                `;
+                contenedor.appendChild(tarjeta);
+            });
+        }
+
+        // 3. Ejecución: Aquí deberías envolver esta llamada en tu lógica de "Si el token es válido..."
+        // if (tokenValidado) { procesarReservas(datosReservas); }
+        procesarReservas(datosReservas);
+
+    </script>
+</body>
+</html>
