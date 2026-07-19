@@ -225,6 +225,19 @@ header p {
   flex-direction: column;
   gap: 10px;
 }
+.day-separator {
+  align-self: center;
+  background: var(--sand);
+  color: var(--azulejo-dk);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 5px 14px;
+  border-radius: 20px;
+  margin: 14px 0 4px;
+}
+.timeline .day-separator:first-child { margin-top: 0; }
 .ev {
   background: var(--card);
   border-radius: 12px;
@@ -371,6 +384,21 @@ function fmtDateTime(iso) {
   } catch (_) { return iso; }
 }
 
+// Etiqueta legible del día (Hoy / Ayer / 17 de julio de 2026)
+function fmtDayLabel(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const hoy = new Date();
+    const ayer = new Date();
+    ayer.setDate(hoy.getDate() - 1);
+    const mismoDia = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    if (mismoDia(d, hoy)) return 'Hoy';
+    if (mismoDia(d, ayer)) return 'Ayer';
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch (_) { return iso; }
+}
+
 function initials(name) {
   if (!name) return '?';
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -428,7 +456,13 @@ async function loadList() {
       return;
     }
 
-    const reservas = data.reservas || [];
+    // Ordenar reservas: más reciente a más antigua, por última actividad
+    const reservas = (data.reservas || []).slice().sort((a, b) => {
+      const ta = a.last_activity ? new Date(a.last_activity).getTime() : 0;
+      const tb = b.last_activity ? new Date(b.last_activity).getTime() : 0;
+      return tb - ta;
+    });
+
     $('res-count').textContent = `${reservas.length} reserva${reservas.length === 1 ? '' : 's'} con interacción`;
 
     if (reservas.length === 0) {
@@ -479,31 +513,46 @@ async function loadDetail(ref) {
     $('detail-title').textContent = data.room_name || `Reserva #${ref}`;
     $('detail-sub').textContent = `#${data.ref} · ${fmtDate(data.arrival)} → ${fmtDate(data.departure)}`;
 
-    const events = data.events || [];
+    // Ordenar eventos: más reciente primero
+    const events = (data.events || []).slice().sort((a, b) => {
+      const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return tb - ta;
+    });
+
     if (events.length === 0) {
       $('timeline').innerHTML = `<div class="ev system">Sin eventos registrados todavía.</div>`;
       return;
     }
 
-    $('timeline').innerHTML = events.map(ev => {
+    // Construir HTML insertando un separador cada vez que cambia el día
+    let html = '';
+    let diaAnterior = null;
+
+    events.forEach(ev => {
+      const dayKey = ev.timestamp ? ev.timestamp.slice(0, 10) : '';
+      if (dayKey !== diaAnterior) {
+        html += `<div class="day-separator">${fmtDayLabel(ev.timestamp)}</div>`;
+        diaAnterior = dayKey;
+      }
+
       const time = fmtDateTime(ev.timestamp);
       if (ev.type === 'chat_user') {
-        return `<div class="ev chat_user"><div class="ev-time">${time}</div>${escapeHtml(ev.content)}</div>`;
+        html += `<div class="ev chat_user"><div class="ev-time">${time}</div>${escapeHtml(ev.content)}</div>`;
+      } else if (ev.type === 'chat_bot') {
+        html += `<div class="ev chat_bot"><div class="ev-time">${time}</div>${escapeHtml(ev.content)}</div>`;
+      } else if (ev.type === 'error') {
+        html += `<div class="ev error"><div class="ev-time">${time}</div>⚠️ ${escapeHtml(ev.content)}</div>`;
+      } else if (ev.type === 'page_view') {
+        html += `<div class="ev system">${time} · <span class="pill">Abrió la web</span> ${ESTADO_LABEL[ev.content] || ev.content}</div>`;
+      } else if (ev.type === 'state_changed') {
+        html += `<div class="ev system">${time} · <span class="pill">Cambio de estado</span> → ${ESTADO_LABEL[ev.content] || ev.content}</div>`;
+      } else {
+        html += `<div class="ev system">${time} · ${ev.type}: ${escapeHtml(ev.content)}</div>`;
       }
-      if (ev.type === 'chat_bot') {
-        return `<div class="ev chat_bot"><div class="ev-time">${time}</div>${escapeHtml(ev.content)}</div>`;
-      }
-      if (ev.type === 'error') {
-        return `<div class="ev error"><div class="ev-time">${time}</div>⚠️ ${escapeHtml(ev.content)}</div>`;
-      }
-      if (ev.type === 'page_view') {
-        return `<div class="ev system">${time} · <span class="pill">Abrió la web</span> ${ESTADO_LABEL[ev.content] || ev.content}</div>`;
-      }
-      if (ev.type === 'state_changed') {
-        return `<div class="ev system">${time} · <span class="pill">Cambio de estado</span> → ${ESTADO_LABEL[ev.content] || ev.content}</div>`;
-      }
-      return `<div class="ev system">${time} · ${ev.type}: ${escapeHtml(ev.content)}</div>`;
-    }).join('');
+    });
+
+    $('timeline').innerHTML = html;
 
   } catch (err) {
     $('detail-loading').style.display = 'none';
