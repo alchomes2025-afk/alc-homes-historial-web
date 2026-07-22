@@ -555,11 +555,11 @@ async function loadDetail(ref) {
     $('detail-title').textContent = data.room_name || `Reserva #${ref}`;
     $('detail-sub').textContent = `#${data.ref} · ${fmtDate(data.arrival)} → ${fmtDate(data.departure)}`;
 
-    // Ordenar eventos: más reciente primero
+    // Ordenar eventos: cronológico (más antiguo primero, más reciente al final)
     const events = (data.events || []).slice().sort((a, b) => {
       const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
       const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-      return tb - ta;
+      return ta - tb;
     });
 
     if (events.length === 0) {
