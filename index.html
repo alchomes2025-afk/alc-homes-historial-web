@@ -559,7 +559,7 @@ async function loadDetail(ref) {
     const events = (data.events || []).slice().sort((a, b) => {
       const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
       const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-      return ta - tb;
+      return tb - ta;
     });
 
     if (events.length === 0) {
