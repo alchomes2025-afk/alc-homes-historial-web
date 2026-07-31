@@ -469,9 +469,9 @@ async function loadList() {
   try {
     const res  = await fetch(`${BACKEND}/historial?token=${encodeURIComponent(TOKEN)}`);
     const data = await res.json();
-    $('loading').style.display = 'none';
 
     if (res.status === 401) {
+      $('loading').style.display = 'none';
       $('gate-err').textContent = 'Token incorrecto.';
       localStorage.removeItem('alc_historial_token');
       $('list-view').style.display = 'none';
@@ -480,6 +480,7 @@ async function loadList() {
     }
 
     if (!data.ok) {
+      $('loading').style.display = 'none';
       $('error').textContent = data.error || 'Error al cargar el histórico.';
       $('error').style.display = 'block';
       return;
@@ -495,9 +496,29 @@ async function loadList() {
     $('res-count').textContent = `${reservas.length} reserva${reservas.length === 1 ? '' : 's'} con interacción`;
 
     if (reservas.length === 0) {
+      $('loading').style.display = 'none';
       $('empty').style.display = 'block';
       return;
     }
+
+    // El "ultimo_estado" guardado en Firestore puede quedarse desactualizado si el
+    // huésped no vuelve a abrir la web (el estado depende de la hora actual, no
+    // solo de la última interacción). Consultamos el estado real y actual de cada
+    // reserva vía /check-in (el mismo endpoint que usa la web del huésped) antes
+    // de mostrar el badge.
+    await Promise.all(reservas.map(async r => {
+      try {
+        const liveRes  = await fetch(`${BACKEND}/check-in?ref=${encodeURIComponent(r.ref)}`);
+        const liveData = await liveRes.json();
+        if (liveData.ok && liveData.estado) {
+          r.estado_actual = liveData.estado;
+        } else {
+          r.estado_actual = r.ultimo_estado; // fallback si no se puede verificar
+        }
+      } catch (_) {
+        r.estado_actual = r.ultimo_estado; // fallback si falla la petición
+      }
+    }));
 
     // Agrupar por día de check-in, insertando un bloque con título por cada día
     let html = '';
@@ -519,13 +540,14 @@ async function loadList() {
           <div class="res-dates">${fmtDate(r.arrival)} → ${fmtDate(r.departure)}</div>
         </div>
         <div class="res-meta">
-          <span class="res-badge ${badgeClass(r.ultimo_estado)}">${ESTADO_LABEL[r.ultimo_estado] || r.ultimo_estado || '—'}</span>
+          <span class="res-badge ${badgeClass(r.estado_actual)}">${ESTADO_LABEL[r.estado_actual] || r.estado_actual || '—'}</span>
           <div class="res-msgcount">${r.n_mensajes} mensaje${r.n_mensajes === 1 ? '' : 's'}</div>
           <div class="res-time">${fmtDateTime(r.last_activity)}</div>
         </div>
       </div>`;
     });
 
+    $('loading').style.display = 'none';
     $('res-list').innerHTML = html;
 
   } catch (err) {
