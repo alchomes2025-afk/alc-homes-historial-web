@@ -327,12 +327,16 @@ header p {
     </div>
   </header>
 
-  <!-- ══ GATE (token de acceso) ═══════════════════════════════════════ -->
+  <!-- ══ GATE (login Google + token de acceso) ═════════════════════════ -->
   <div id="gate">
     <h2>Acceso restringido</h2>
-    <p>Introduce el token de administración para ver el histórico.</p>
-    <input type="password" id="gate-input" placeholder="Token" autocomplete="off">
-    <button onclick="unlock()">Entrar</button>
+    <p id="gate-google-p">Inicia sesión con la cuenta de Google autorizada.</p>
+    <button id="google-signin-btn" onclick="signInGoogle()">🔒 Iniciar sesión con Google</button>
+    <div id="gate-token-section" style="display:none">
+      <p>Introduce el token de administración para ver el histórico.</p>
+      <input type="password" id="gate-input" placeholder="Token" autocomplete="off">
+      <button onclick="unlock()">Entrar</button>
+    </div>
     <div class="err" id="gate-err"></div>
   </div>
 
@@ -363,10 +367,30 @@ header p {
 
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 'use strict';
 const BACKEND = 'https://hostal-pdf-extractor.onrender.com';
 const $ = id => document.getElementById(id);
+
+// ── Login con Google (restringido a la cuenta del propietario) ──────────
+// Nota: esto es un filtro visual en el frontend, no una protección real del
+// backend — /historial sigue exigiendo el token compartido de siempre. Si en
+// el futuro se quiere que el backend también verifique la sesión de Firebase,
+// avisar antes de tocar routes/historial.py (ver claude.md del backend).
+const firebaseConfig = {
+  apiKey: "AIzaSyCWRcQSKYHuMGVaRbwgpD0CIZ4PAN1S2qA",
+  authDomain: "alc-homes-checkin.firebaseapp.com",
+  projectId: "alc-homes-checkin",
+  storageBucket: "alc-homes-checkin.firebasestorage.app",
+  messagingSenderId: "499375605744",
+  appId: "1:499375605744:web:2aebdf197dd3e408eabf35",
+  measurementId: "G-JPEZGWEZPL"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const ALLOWED_EMAIL = 'alchomes2025@gmail.com';
 
 let TOKEN = localStorage.getItem('alc_historial_token') || '';
 
@@ -434,6 +458,40 @@ function fmtCheckinDayLabel(iso) {
 }
 
 // ── GATE ───────────────────────────────────────────────────────────────
+function signInGoogle() {
+  $('gate-err').textContent = '';
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).then(result => {
+    const email = result.user.email || '';
+    if (email !== ALLOWED_EMAIL) {
+      $('gate-err').textContent = `Esta cuenta (${email}) no tiene acceso.`;
+      auth.signOut();
+      return;
+    }
+    onGoogleAuthed();
+  }).catch(err => {
+    $('gate-err').textContent = 'Error al iniciar sesión: ' + (err.message || err);
+  });
+}
+
+function onGoogleAuthed() {
+  $('gate-google-p').style.display = 'none';
+  $('google-signin-btn').style.display = 'none';
+  if (TOKEN) {
+    showList();
+  } else {
+    $('gate-token-section').style.display = 'block';
+  }
+}
+
+// Restaura la sesión de Google entre recargas (Firebase la persiste sola).
+// Este listener es el que realmente decide si se muestra el gate o la app.
+auth.onAuthStateChanged(user => {
+  if (user && user.email === ALLOWED_EMAIL) {
+    onGoogleAuthed();
+  }
+});
+
 function unlock() {
   const val = $('gate-input').value.trim();
   if (!val) return;
@@ -474,8 +532,10 @@ async function loadList() {
       $('loading').style.display = 'none';
       $('gate-err').textContent = 'Token incorrecto.';
       localStorage.removeItem('alc_historial_token');
+      TOKEN = '';
       $('list-view').style.display = 'none';
       $('gate').style.display = 'block';
+      $('gate-token-section').style.display = 'block'; // ya pasó el login de Google, solo falta el token
       return;
     }
 
@@ -631,11 +691,10 @@ function escapeHtml(str) {
 }
 
 // ── INICIO ─────────────────────────────────────────────────────────────
-if (TOKEN) {
-  showList();
-} else {
-  $('gate').style.display = 'block';
-}
+// El gate arranca visible por defecto (login de Google primero); si Firebase
+// restaura una sesión ya autorizada, onAuthStateChanged se encarga de
+// avanzar automáticamente (a la lista, o al paso del token si aún falta).
+$('gate').style.display = 'block';
 </script>
 </body>
 </html>

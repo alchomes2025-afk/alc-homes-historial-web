@@ -10,7 +10,7 @@ Panel de administración/historial para el hostal ALC Homes San Blas. Muestra el
 
 ## Comportamiento clave
 - Los registros de interacción se respaldan en **Firestore**.
-- Login con Google Sign-In estaba planeado en su momento — **verificar el estado real en el código** antes de asumir que está implementado o no.
+- **Login con Google Sign-In implementado (septiembre 2026)**: Firebase Auth (proyecto `alc-homes-checkin`, mismo que el frontend de check-in), restringido a `alchomes2025@gmail.com` por comparación de email en el cliente. Es solo un filtro visual: tras el login de Google, sigue apareciendo el paso del token de administración de siempre (`API_TOKEN`/`TEST_TOKEN`), porque el backend (`/historial`) no verifica la sesión de Firebase — sigue exigiendo ese mismo token compartido. Si se quiere que el backend también valide el login de Google, hay que tocar `routes/historial.py` en `hostal-pdf-extractor` (avisar antes, según su propio claude.md).
 
 ## Estilo de trabajo de Adrián
 - Sin entorno local hasta ahora — viene de trabajar 100% desde GitHub web UI, commits directos a `main` con auto-deploy. Verificar en local con Claude Code antes de hacer push.
